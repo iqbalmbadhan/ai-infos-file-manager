@@ -32,6 +32,7 @@ The tool has full access to your files, so it is locked down by default:
 |---|---|
 | Password login | The manager **won't run** until you change the default password |
 | Hashed passwords | Accepts a `password_hash()` hash as well as a plain password |
+| IP allowlist | Optionally restrict access to specific IP addresses; everyone else gets `403 Forbidden` |
 | Brute-force delay | Each wrong password adds a 2-second delay |
 | Root jail | Every path is resolved with `realpath()` and must stay inside the root folder. `../` tricks and symlinks that point outside are blocked |
 | CSRF tokens | Every action that changes something needs a valid token |
@@ -62,11 +63,33 @@ The tool has full access to your files, so it is locked down by default:
 All settings are in the block at the top of `fm.php`:
 
 ```php
-$FM_PASSWORD = 'change-me';        // plain text, or a password_hash() string
-$FM_ROOT     = __DIR__;            // folder to manage
-$FM_TITLE    = 'AI Infos File Manager'; // name shown in the header
-$FM_EDIT_MAX = 2 * 1024 * 1024;    // largest file (bytes) you can edit in the browser
+$FM_PASSWORD    = 'change-me';              // plain text, password_hash() string, or false
+$FM_ALLOWED_IPS = [];                       // IPs allowed in; empty = any IP
+$FM_ROOT        = __DIR__;                  // folder to manage
+$FM_TITLE       = 'AI Infos File Manager';  // name shown in the header
+$FM_EDIT_MAX    = 2 * 1024 * 1024;          // largest file (bytes) you can edit in the browser
 ```
+
+### Restrict access by IP
+
+Only the listed IP addresses can open the manager. Everyone else gets `403 Forbidden`:
+
+```php
+$FM_ALLOWED_IPS = ['203.0.113.10', '198.51.100.7'];
+```
+
+> Behind Cloudflare or another reverse proxy, PHP sees the proxy's IP rather than the visitor's, so this check won't work as is.
+
+### Password-free mode
+
+Set the password to `false` to skip the login screen entirely:
+
+```php
+$FM_PASSWORD    = false;
+$FM_ALLOWED_IPS = ['203.0.113.10'];   // strongly recommended
+```
+
+> ⚠️ **Without an IP allowlist, anyone who finds the URL gets full control of your files.** Bots constantly scan for file managers. Only use password-free mode together with `$FM_ALLOWED_IPS`, or on localhost or a private network. If your IP changes often, keep a password instead.
 
 ### Use a hashed password (recommended)
 

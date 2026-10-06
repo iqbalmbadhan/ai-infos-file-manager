@@ -11,7 +11,12 @@
 // ===================== CONFIG =====================
 // Plain text password, OR (better) a hash generated with:
 //   php -r "echo password_hash('your-password', PASSWORD_DEFAULT);"
+// Set to false for password-free entry. Only do that together with $FM_ALLOWED_IPS,
+// otherwise ANYONE who finds the URL controls your files.
 $FM_PASSWORD = 'change-me';
+// Only these IP addresses may open the manager, e.g. ['203.0.113.10', '127.0.0.1'].
+// Empty array = any IP (password still applies).
+$FM_ALLOWED_IPS = [];
 // Folder to manage. __DIR__ = folder this file is in. Or use $_SERVER['DOCUMENT_ROOT'].
 $FM_ROOT     = __DIR__;
 $FM_TITLE    = 'AI Infos File Manager';
@@ -21,6 +26,10 @@ $FM_EDIT_MAX = 2 * 1024 * 1024; // max file size (bytes) editable in the browser
 error_reporting(E_ALL & ~E_NOTICE & ~E_DEPRECATED);
 header('X-Robots-Tag: noindex, nofollow');
 header('X-Frame-Options: DENY');
+
+if ($FM_ALLOWED_IPS && !in_array($_SERVER['REMOTE_ADDR'] ?? '', $FM_ALLOWED_IPS, true)) {
+    http_response_code(403); exit('Forbidden');
+}
 
 session_name('ofm_sess');
 if (PHP_VERSION_ID >= 70300) {
@@ -141,7 +150,8 @@ if ($FM_PASSWORD === 'change-me') {
 if ($ROOT === false || !is_dir($ROOT)) { head('Error'); echo '<div class="flash err">FM_ROOT does not exist.</div>'; foot(); }
 
 // ---------- auth ----------
-if (isset($_GET['logout'])) { session_destroy(); header('Location: ' . $SELF); exit; }
+if ($FM_PASSWORD === false) $_SESSION['ofm_auth'] = true; // password-free mode
+if (isset($_GET['logout']) && $FM_PASSWORD !== false) { session_destroy(); header('Location: ' . $SELF); exit; }
 
 if (empty($_SESSION['ofm_auth'])) {
     if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['password'])) {
@@ -268,7 +278,7 @@ if (isset($_GET['edit'])) {
     if (strpos($content, "\0") !== false) { flash('err', 'That looks like a binary file.'); back($dirRel); }
     $crlf = strpos($content, "\r\n") !== false;
     head('Edit ' . basename($f)); ?>
-    <div class="top"><div class="brand"><?= h($GLOBALS['FM_TITLE']) ?></div><a href="?logout">Log out</a></div>
+    <div class="top"><div class="brand"><?= h($GLOBALS['FM_TITLE']) ?></div><?= $GLOBALS['FM_PASSWORD'] === false ? '' : '<a href="?logout">Log out</a>' ?></div>
     <form method="post" class="card" id="ed">
       <input type="hidden" name="csrf" value="<?= h($_SESSION['csrf']) ?>">
       <input type="hidden" name="do" value="save">
@@ -312,7 +322,7 @@ foreach (@scandir($dir) ?: [] as $n) {
 usort($items, function ($a, $b) { return $a['dir'] === $b['dir'] ? strnatcasecmp($a['n'], $b['n']) : ($a['dir'] ? -1 : 1); });
 
 head($dirRel === '' ? 'Root' : $dirRel); ?>
-<div class="top"><div class="brand"><?= h($FM_TITLE) ?></div><a href="?logout">Log out</a></div>
+<div class="top"><div class="brand"><?= h($FM_TITLE) ?></div><?= $GLOBALS['FM_PASSWORD'] === false ? '' : '<a href="?logout">Log out</a>' ?></div>
 <div class="card">
   <div class="crumbs">
     <a href="?d=">🏠 root</a><?php
